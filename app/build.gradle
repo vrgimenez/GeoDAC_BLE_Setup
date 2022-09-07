@@ -7,7 +7,7 @@ android {
         minSdkVersion 18
         vectorDrawables.useSupportLibrary true
 
-        applicationId "de.kai_morich.simple_bluetooth_le_terminal"
+        applicationId "ar.vrx_design.geodac_ble_setup_utility"
         versionCode 1
         versionName "1.0"
     }

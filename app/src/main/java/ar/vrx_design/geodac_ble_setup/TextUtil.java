@@ -1,4 +1,4 @@
-package de.kai_morich.simple_bluetooth_le_terminal;
+package ar.vrx_design.geodac_ble_setup;
 
 import android.text.Editable;
 import android.text.InputType;

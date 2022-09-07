@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    package="de.kai_morich.simple_bluetooth_le_terminal">
+    package="ar.vrx_design.geodac_ble_setup">
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.BLUETOOTH" />
@@ -15,7 +15,7 @@
         android:theme="@style/AppTheme"
         tools:ignore="AllowBackup,GoogleAppIndexingWarning">
         <activity
-            android:name=".MainActivity"
+            android:name="ar.vrx_design.geodac_ble_setup.MainActivity"
             android:label="@string/app_name"
             android:windowSoftInputMode="stateHidden|adjustResize">
             <intent-filter>
@@ -23,7 +23,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <service android:name=".SerialService" />
+        <service android:name="ar.vrx_design.geodac_ble_setup.SerialService" />
     </application>
 
 </manifest>

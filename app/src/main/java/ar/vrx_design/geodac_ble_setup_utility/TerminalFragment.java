@@ -10,14 +10,12 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.CountDownTimer;
 import android.os.IBinder;
 import android.text.Editable;
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
 import android.text.method.ScrollingMovementMethod;
 import android.text.style.ForegroundColorSpan;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -39,8 +37,6 @@ import androidx.annotation.RequiresApi;
 import androidx.fragment.app.Fragment;
 
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Arrays;
 
 public class TerminalFragment extends Fragment implements ServiceConnection, SerialListener {
 
@@ -83,10 +79,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private Button btn_get_pwron_counter, btn_set_pwron_counter;
     private EditText et_pwron_counter;
     private Button btn_reset;
-    private String msg2 = "";
-
-    ArrayList<Byte> data2 = new ArrayList<>();
-    boolean timerActive;
+    private String msg;
+    private int eol;
 
     /*
      * Lifecycle
@@ -709,11 +703,10 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     private void receive(byte[] data) {
-        Log.d("DATA ", Arrays.toString(data));
         if(hexEnabled) {
             receiveText.append(TextUtil.toHexString(data) + '\n');
         } else {
-            String msg = new String(data, StandardCharsets.ISO_8859_1);
+            msg+= new String(data, StandardCharsets.ISO_8859_1);
             if(newline.equals(TextUtil.newline_crlf) && msg.length() > 0) {
                 // don't show CR as ^M if directly before LF
                 msg = msg.replace(TextUtil.newline_crlf, TextUtil.newline_lf);
@@ -729,77 +722,101 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
             final String _VER_ = "+VER: ";
             if(msg.contains(_VER_)) {
-                String versionStr = msg.substring(
-                        msg.indexOf(_VER_) + _VER_.length(),
-                        msg.indexOf(" | ", msg.indexOf(_VER_)));
-                tv_version.setText(versionStr);
+                eol = msg.indexOf(" | ", msg.indexOf(_VER_));
+                if(eol > 0) {
+                    String versionStr = msg.substring(
+                            msg.indexOf(_VER_) + _VER_.length(), eol);
+                    tv_version.setText(versionStr);
+                    msg = "";
+                }
             }
             final String _SN_ = "+SN: ";
             if(msg.contains(_SN_)) {
-                et_serial.setText(
-                        msg.substring(
-                                msg.indexOf(_SN_) + _SN_.length(),
-                                msg.indexOf(TextUtil.newline_lf, msg.indexOf(_SN_)))
-                );
+                eol = msg.indexOf(TextUtil.newline_lf, msg.indexOf(_SN_));
+                if(eol > 0) {
+                    et_serial.setText(
+                            msg.substring(
+                                    msg.indexOf(_SN_) + _SN_.length(), eol)
+                    );
+                    msg = "";
+                }
             }
             final String _SENCFG_ = "+SENCFG: ";
             if(msg.contains(_SENCFG_)) {
                 byte[] SensorCfgBytes;
-                String SensorCfgStr = msg.substring(
-                        msg.indexOf(_SENCFG_) + _SENCFG_.length(),
-                        msg.indexOf(TextUtil.newline_lf, msg.indexOf(_SENCFG_)));
-                SensorCfgBytes = TextUtil.fromHexString(SensorCfgStr);
+                eol = msg.indexOf(TextUtil.newline_lf, msg.indexOf(_SENCFG_));
+                if(eol > 0) {
+                    String SensorCfgStr = msg.substring(
+                            msg.indexOf(_SENCFG_) + _SENCFG_.length(), eol);
+                    SensorCfgBytes = TextUtil.fromHexString(SensorCfgStr);
 
-                getSensorCfgBits(SensorCfgBytes);
-                updateSensorCfg();
+                    getSensorCfgBits(SensorCfgBytes);
+                    updateSensorCfg();
 
-                et_sens_cfg.setText(String.format("%04X", SensorCfg));
+                    et_sens_cfg.setText(String.format("%04X", SensorCfg));
+                    msg = "";
+                }
             }
             final String _REMIS_ = "+REMIS: ";
             if(msg.contains(_REMIS_)) {
-                if (Byte.parseByte(
-                        msg.substring(
-                                msg.indexOf(_REMIS_) + _REMIS_.length(),
-                                msg.indexOf(TextUtil.newline_lf, msg.indexOf(_REMIS_)))) == 1)
-                    sp_busy_source.setSelection(0);
+                eol = msg.indexOf(TextUtil.newline_lf, msg.indexOf(_REMIS_));
+                if(eol > 0) {
+                    if (Byte.parseByte(
+                            msg.substring(
+                                    msg.indexOf(_REMIS_) + _REMIS_.length(), eol)) == 1)
+                        sp_busy_source.setSelection(0);
+                    msg = "";
+                }
             }
             final String _ODOMC_ = "+ODOMC: ";
             if(msg.contains(_ODOMC_)) {
-                et_odom_constant.setText(
-                        msg.substring(
-                                msg.indexOf(_ODOMC_) + _ODOMC_.length(),
-                                msg.indexOf(TextUtil.newline_lf, msg.indexOf(_ODOMC_)))
-                );
+                eol = msg.indexOf(TextUtil.newline_lf, msg.indexOf(_ODOMC_));
+                if(eol > 0) {
+                    et_odom_constant.setText(
+                            msg.substring(
+                                    msg.indexOf(_ODOMC_) + _ODOMC_.length(), eol)
+                    );
+                    msg = "";
+                }
             }
             final String _ODOMV_ = "+ODOMV: ";
             if(msg.contains(_ODOMV_)) {
-                et_odom_value.setText(
-                        msg.substring(
-                                msg.indexOf(_ODOMV_) + _ODOMV_.length(),
-                                msg.indexOf(TextUtil.newline_lf, msg.indexOf(_ODOMV_)))
-                );
+                eol = msg.indexOf(TextUtil.newline_lf, msg.indexOf(_ODOMV_));
+                if(eol > 0) {
+                    et_odom_value.setText(
+                            msg.substring(
+                                    msg.indexOf(_ODOMV_) + _ODOMV_.length(), eol)
+                    );
+                    msg = "";
+                }
             }
             final String _ODOMD_ = "+ODOMD: ";
             if(msg.contains(_ODOMD_)) {
-                byte OdometerDiv = Byte.parseByte(
-                        msg.substring(
-                                msg.indexOf(_ODOMD_) + _ODOMD_.length(),
-                                msg.indexOf(TextUtil.newline_lf,msg.indexOf(_ODOMD_))));
-                switch(OdometerDiv)
-                {
-                    case 8: sp_odom_divider.setSelection(0); break;
-                    case 4: sp_odom_divider.setSelection(1); break;
-                    case 2: sp_odom_divider.setSelection(2); break;
-                    case 1: sp_odom_divider.setSelection(3); break;
+                eol = msg.indexOf(TextUtil.newline_lf,msg.indexOf(_ODOMD_));
+                if(eol > 0) {
+                    byte OdometerDiv = Byte.parseByte(
+                            msg.substring(
+                                    msg.indexOf(_ODOMD_) + _ODOMD_.length(), eol)
+                    );
+                    switch (OdometerDiv) {
+                        case 8: sp_odom_divider.setSelection(0);    break;
+                        case 4: sp_odom_divider.setSelection(1);    break;
+                        case 2: sp_odom_divider.setSelection(2);    break;
+                        case 1: sp_odom_divider.setSelection(3);    break;
+                    }
+                    msg = "";
                 }
             }
             final String _PWRON_ = "+PWRON: ";
             if(msg.contains(_PWRON_)) {
-                et_pwron_counter.setText(
-                        msg.substring(
-                                msg.indexOf(_PWRON_) + _PWRON_.length(),
-                                msg.indexOf(TextUtil.newline_lf,msg.indexOf(_PWRON_)))
-                );
+                eol = msg.indexOf(TextUtil.newline_lf,msg.indexOf(_PWRON_));
+                if(eol > 0) {
+                    et_pwron_counter.setText(
+                            msg.substring(
+                                    msg.indexOf(_PWRON_) + _PWRON_.length(), eol)
+                    );
+                    msg = "";
+                }
             }
         }
     }
@@ -828,26 +845,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     @Override
     public void onSerialRead(byte[] data) {
-        for (byte b:data) {
-            data2.add(b);
-        }
-        if (!timerActive) {
-            new CountDownTimer(100, 10) {
-                public void onTick(long millisUntilFinished) {
-                }
-                public void onFinish() {
-                    timerActive = false;
-                    byte[] dataAux = new byte[data2.size()];
-                    for (int i = 0; i < dataAux.length; i++) {
-                        dataAux[i] = (byte) data2.get(i);
-                    }
-                    receive(dataAux);
-                    data2.clear();
-                }
-            }.start();
-        }
-        Log.d("receiver data  ", Arrays.toString(data));
-        Log.d("receiver data2 ", String.valueOf(data2));
+        receive(data);
     }
 
     @Override

@@ -1,4 +1,4 @@
-package ar.vrx_design.geodac_ble_setup;
+package ar.vrx_design.geodac_ble_setup_utility;
 
 import android.app.Notification;
 import android.app.NotificationChannel;

@@ -1,4 +1,4 @@
-package ar.vrx_design.geodac_ble_setup;
+package ar.vrx_design.geodac_ble_setup_utility;
 
 import android.os.Bundle;
 import androidx.fragment.app.FragmentManager;

@@ -4,7 +4,7 @@
     <!ENTITY company_url "www.makerelectronica.com.ar">
     <!ENTITY legal_copyright "(c)2022 Ing.V.Raúl Giménez | vrgimenez@gmail.com">
     <!ENTITY product_name "GeoDAC BLE Setup">
-    <!ENTITY product_version "22.0922b">
+    <!ENTITY product_version "24.0724">
     ]>
 
 <resources>

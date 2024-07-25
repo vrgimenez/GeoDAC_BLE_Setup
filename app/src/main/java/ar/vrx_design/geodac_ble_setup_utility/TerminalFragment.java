@@ -718,7 +718,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 }
                 pendingNewline = msg.charAt(msg.length() - 1) == '\r';
             }
-            receiveText.append(TextUtil.toCaretString(msg, newline.length() != 0));
+        //  receiveText.append(TextUtil.toCaretString(msg, newline.length() != 0));
 
             final String _VER_ = "+VER: ";
             if(msg.contains(_VER_)) {
@@ -765,6 +765,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                             msg.substring(
                                     msg.indexOf(_REMIS_) + _REMIS_.length(), eol)) == 1)
                         sp_busy_source.setSelection(0);
+                    else
+                        sp_busy_source.setSelection(1);
                     msg = "";
                 }
             }

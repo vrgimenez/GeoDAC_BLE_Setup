@@ -1,5 +1,6 @@
 package ar.vrx_design.geodac_ble_setup_utility;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
@@ -33,9 +34,10 @@ import android.widget.ToggleButton;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.annotation.RequiresApi;
 import androidx.fragment.app.Fragment;
 
+import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.nio.charset.StandardCharsets;
 
 public class TerminalFragment extends Fragment implements ServiceConnection, SerialListener {
@@ -619,7 +621,16 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     @Override
     public void onCreateOptionsMenu(@NonNull Menu menu, MenuInflater inflater) {
         inflater.inflate(R.menu.menu_terminal, menu);
+    }
+
+    public void onPrepareOptionsMenu(@NonNull Menu menu) {
         menu.findItem(R.id.hex).setChecked(hexEnabled);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            menu.findItem(R.id.backgroundNotification).setChecked(service != null && service.areNotificationsEnabled());
+        } else {
+            menu.findItem(R.id.backgroundNotification).setChecked(true);
+            menu.findItem(R.id.backgroundNotification).setEnabled(false);
+        }
     }
 
     @Override
@@ -646,6 +657,15 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             hexWatcher.enable(hexEnabled);
             sendText.setHint(hexEnabled ? "HEX mode" : "");
             item.setChecked(hexEnabled);
+            return true;
+        } else if (id == R.id.backgroundNotification) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (!service.areNotificationsEnabled() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 0);
+                } else {
+                    showNotificationSettings();
+                }
+            }
             return true;
         } else {
             return super.onOptionsItemSelected(item);
@@ -701,132 +721,161 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         }
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
-    private void receive(byte[] data) {
-        if(hexEnabled) {
-            receiveText.append(TextUtil.toHexString(data) + '\n');
-        } else {
-            msg+= new String(data, StandardCharsets.ISO_8859_1);
-            if(newline.equals(TextUtil.newline_crlf) && msg.length() > 0) {
-                // don't show CR as ^M if directly before LF
-                msg = msg.replace(TextUtil.newline_crlf, TextUtil.newline_lf);
-                // special handling if CR and LF come in separate fragments
-                if (pendingNewline && msg.charAt(0) == '\n') {
-                    Editable edt = receiveText.getEditableText();
-                    if (edt != null && edt.length() > 1)
-                        edt.replace(edt.length() - 2, edt.length(), "");
+    private void receive(ArrayDeque<byte[]> datas) {
+        SpannableStringBuilder spn = new SpannableStringBuilder();
+        for (byte[] data : datas) {
+            if (hexEnabled) {
+                spn.append(TextUtil.toHexString(data)).append('\n');
+            } else {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                    msg+= new String(data, StandardCharsets.ISO_8859_1);
+                } else {
+                    msg+= new String(data);
                 }
-                pendingNewline = msg.charAt(msg.length() - 1) == '\r';
-            }
-        //  receiveText.append(TextUtil.toCaretString(msg, newline.length() != 0));
-
-            final String _VER_ = "+VER: ";
-            if(msg.contains(_VER_)) {
-                eol = msg.indexOf(" | ", msg.indexOf(_VER_));
-                if(eol > 0) {
-                    String versionStr = msg.substring(
-                            msg.indexOf(_VER_) + _VER_.length(), eol);
-                    tv_version.setText(versionStr);
-                    msg = "";
-                }
-            }
-            final String _SN_ = "+SN: ";
-            if(msg.contains(_SN_)) {
-                eol = msg.indexOf(TextUtil.newline_lf, msg.indexOf(_SN_));
-                if(eol > 0) {
-                    et_serial.setText(
-                            msg.substring(
-                                    msg.indexOf(_SN_) + _SN_.length(), eol)
-                    );
-                    msg = "";
-                }
-            }
-            final String _SENCFG_ = "+SENCFG: ";
-            if(msg.contains(_SENCFG_)) {
-                byte[] SensorCfgBytes;
-                eol = msg.indexOf(TextUtil.newline_lf, msg.indexOf(_SENCFG_));
-                if(eol > 0) {
-                    String SensorCfgStr = msg.substring(
-                            msg.indexOf(_SENCFG_) + _SENCFG_.length(), eol);
-                    SensorCfgBytes = TextUtil.fromHexString(SensorCfgStr);
-
-                    getSensorCfgBits(SensorCfgBytes);
-                    updateSensorCfg();
-
-                    et_sens_cfg.setText(String.format("%04X", SensorCfg));
-                    msg = "";
-                }
-            }
-            final String _REMIS_ = "+REMIS: ";
-            if(msg.contains(_REMIS_)) {
-                eol = msg.indexOf(TextUtil.newline_lf, msg.indexOf(_REMIS_));
-                if(eol > 0) {
-                    if (Byte.parseByte(
-                            msg.substring(
-                                    msg.indexOf(_REMIS_) + _REMIS_.length(), eol)) == 1)
-                        sp_busy_source.setSelection(0);
-                    else
-                        sp_busy_source.setSelection(1);
-                    msg = "";
-                }
-            }
-            final String _ODOMC_ = "+ODOMC: ";
-            if(msg.contains(_ODOMC_)) {
-                eol = msg.indexOf(TextUtil.newline_lf, msg.indexOf(_ODOMC_));
-                if(eol > 0) {
-                    et_odom_constant.setText(
-                            msg.substring(
-                                    msg.indexOf(_ODOMC_) + _ODOMC_.length(), eol)
-                    );
-                    msg = "";
-                }
-            }
-            final String _ODOMV_ = "+ODOMV: ";
-            if(msg.contains(_ODOMV_)) {
-                eol = msg.indexOf(TextUtil.newline_lf, msg.indexOf(_ODOMV_));
-                if(eol > 0) {
-                    et_odom_value.setText(
-                            msg.substring(
-                                    msg.indexOf(_ODOMV_) + _ODOMV_.length(), eol)
-                    );
-                    msg = "";
-                }
-            }
-            final String _ODOMD_ = "+ODOMD: ";
-            if(msg.contains(_ODOMD_)) {
-                eol = msg.indexOf(TextUtil.newline_lf,msg.indexOf(_ODOMD_));
-                if(eol > 0) {
-                    byte OdometerDiv = Byte.parseByte(
-                            msg.substring(
-                                    msg.indexOf(_ODOMD_) + _ODOMD_.length(), eol)
-                    );
-                    switch (OdometerDiv) {
-                        case 8: sp_odom_divider.setSelection(0);    break;
-                        case 4: sp_odom_divider.setSelection(1);    break;
-                        case 2: sp_odom_divider.setSelection(2);    break;
-                        case 1: sp_odom_divider.setSelection(3);    break;
+                if (newline.equals(TextUtil.newline_crlf) && msg.length() > 0) {
+                    // don't show CR as ^M if directly before LF
+                    msg = msg.replace(TextUtil.newline_crlf, TextUtil.newline_lf);
+                    // special handling if CR and LF come in separate fragments
+                    if (pendingNewline && msg.charAt(0) == '\n') {
+                        if (spn.length() >= 2) {
+                            spn.delete(spn.length() - 2, spn.length());
+                        } else {
+                            Editable edt = receiveText.getEditableText();
+                            if (edt != null && edt.length() >= 2)
+                                edt.delete(edt.length() - 2, edt.length());
+                        }
                     }
-                    msg = "";
+                    pendingNewline = msg.charAt(msg.length() - 1) == '\r';
                 }
-            }
-            final String _PWRON_ = "+PWRON: ";
-            if(msg.contains(_PWRON_)) {
-                eol = msg.indexOf(TextUtil.newline_lf,msg.indexOf(_PWRON_));
-                if(eol > 0) {
-                    et_pwron_counter.setText(
-                            msg.substring(
-                                    msg.indexOf(_PWRON_) + _PWRON_.length(), eol)
-                    );
-                    msg = "";
+                spn.append(TextUtil.toCaretString(msg, newline.length() != 0));
+
+                final String _VER_ = "+VER: ";
+                if (msg.contains(_VER_)) {
+                    eol = msg.indexOf(" | ", msg.indexOf(_VER_));
+                    if (eol > 0) {
+                        String versionStr = msg.substring(
+                                msg.indexOf(_VER_) + _VER_.length(), eol);
+                        tv_version.setText(versionStr);
+                        msg = "";
+                    }
+                }
+                final String _SN_ = "+SN: ";
+                if (msg.contains(_SN_)) {
+                    eol = msg.indexOf(TextUtil.newline_lf, msg.indexOf(_SN_));
+                    if (eol > 0) {
+                        et_serial.setText(
+                                msg.substring(
+                                        msg.indexOf(_SN_) + _SN_.length(), eol)
+                        );
+                        msg = "";
+                    }
+                }
+                final String _SENCFG_ = "+SENCFG: ";
+                if (msg.contains(_SENCFG_)) {
+                    byte[] SensorCfgBytes;
+                    eol = msg.indexOf(TextUtil.newline_lf, msg.indexOf(_SENCFG_));
+                    if (eol > 0) {
+                        String SensorCfgStr = msg.substring(
+                                msg.indexOf(_SENCFG_) + _SENCFG_.length(), eol);
+                        SensorCfgBytes = TextUtil.fromHexString(SensorCfgStr);
+
+                        getSensorCfgBits(SensorCfgBytes);
+                        updateSensorCfg();
+
+                        et_sens_cfg.setText(String.format("%04X", SensorCfg));
+                        msg = "";
+                    }
+                }
+                final String _REMIS_ = "+REMIS: ";
+                if (msg.contains(_REMIS_)) {
+                    eol = msg.indexOf(TextUtil.newline_lf, msg.indexOf(_REMIS_));
+                    if (eol > 0) {
+                        if (Byte.parseByte(
+                                msg.substring(
+                                        msg.indexOf(_REMIS_) + _REMIS_.length(), eol)) == 1)
+                            sp_busy_source.setSelection(0);
+                        else
+                            sp_busy_source.setSelection(1);
+                        msg = "";
+                    }
+                }
+                final String _ODOMC_ = "+ODOMC: ";
+                if (msg.contains(_ODOMC_)) {
+                    eol = msg.indexOf(TextUtil.newline_lf, msg.indexOf(_ODOMC_));
+                    if (eol > 0) {
+                        et_odom_constant.setText(
+                                msg.substring(
+                                        msg.indexOf(_ODOMC_) + _ODOMC_.length(), eol)
+                        );
+                        msg = "";
+                    }
+                }
+                final String _ODOMV_ = "+ODOMV: ";
+                if (msg.contains(_ODOMV_)) {
+                    eol = msg.indexOf(TextUtil.newline_lf, msg.indexOf(_ODOMV_));
+                    if (eol > 0) {
+                        et_odom_value.setText(
+                                msg.substring(
+                                        msg.indexOf(_ODOMV_) + _ODOMV_.length(), eol)
+                        );
+                        msg = "";
+                    }
+                }
+                final String _ODOMD_ = "+ODOMD: ";
+                if (msg.contains(_ODOMD_)) {
+                    eol = msg.indexOf(TextUtil.newline_lf, msg.indexOf(_ODOMD_));
+                    if (eol > 0) {
+                        byte OdometerDiv = Byte.parseByte(
+                                msg.substring(
+                                        msg.indexOf(_ODOMD_) + _ODOMD_.length(), eol)
+                        );
+                        switch (OdometerDiv) {
+                            case 8: sp_odom_divider.setSelection(0);    break;
+                            case 4: sp_odom_divider.setSelection(1);    break;
+                            case 2: sp_odom_divider.setSelection(2);    break;
+                            case 1: sp_odom_divider.setSelection(3);    break;
+                        }
+                        msg = "";
+                    }
+                }
+                final String _PWRON_ = "+PWRON: ";
+                if (msg.contains(_PWRON_)) {
+                    eol = msg.indexOf(TextUtil.newline_lf, msg.indexOf(_PWRON_));
+                    if (eol > 0) {
+                        et_pwron_counter.setText(
+                                msg.substring(
+                                        msg.indexOf(_PWRON_) + _PWRON_.length(), eol)
+                        );
+                        msg = "";
+                    }
                 }
             }
         }
+        //receiveText.append(spn);
     }
 
     private void status(String str) {
         SpannableStringBuilder spn = new SpannableStringBuilder(str + '\n');
         spn.setSpan(new ForegroundColorSpan(getResources().getColor(R.color.colorStatusText)), 0, spn.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
         receiveText.append(spn);
+    }
+
+    /*
+     * starting with Android 14, notifications are not shown in notification bar by default when App is in background
+     */
+
+    private void showNotificationSettings() {
+        Intent intent = new Intent();
+        intent.setAction("android.settings.APP_NOTIFICATION_SETTINGS");
+        intent.putExtra("android.provider.extra.APP_PACKAGE", getActivity().getPackageName());
+        startActivity(intent);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        if(Arrays.equals(permissions, new String[]{Manifest.permission.POST_NOTIFICATIONS}) &&
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !service.areNotificationsEnabled())
+            showNotificationSettings();
     }
 
     /*
@@ -844,10 +893,15 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         disconnect();
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     @Override
     public void onSerialRead(byte[] data) {
-        receive(data);
+        ArrayDeque<byte[]> datas = new ArrayDeque<>();
+        datas.add(data);
+        receive(datas);
+    }
+
+    public void onSerialRead(ArrayDeque<byte[]> datas) {
+        receive(datas);
     }
 
     @Override
